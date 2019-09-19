@@ -212,6 +212,7 @@ clk_rcg2_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
 	const struct freq_tbl *f_curr;
 	u32 cfg, hid_div, m = 0, n = 0, mode = 0, mask;
+	unsigned long recalc_rate;
 
 	if (rcg->enable_safe_config && (!clk_hw_is_prepared(hw)
 				|| !clk_hw_is_enabled(hw))) {
@@ -246,7 +247,16 @@ clk_rcg2_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 		hid_div &= mask;
 	}
 
-	return calc_rate(parent_rate, m, n, mode, hid_div);
+	recalc_rate = calc_rate(parent_rate, m, n, mode, hid_div);
+
+	/*
+	 * Check the case when the RCG has been initialized to a non-CXO
+	 * frequency.
+	 */
+	if (rcg->enable_safe_config && !rcg->current_freq)
+		rcg->current_freq = recalc_rate;
+
+	return recalc_rate;
 }
 
 static int _freq_tbl_determine_rate(struct clk_hw *hw,
