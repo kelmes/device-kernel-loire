@@ -1153,10 +1153,6 @@
 	status = "disabled";
 };
 
-&mdss_fb0 {
-	/delete-property/ qcom,mdss-fb-splash-logo-enabled;
-};
-
 &mdss_dsi {
 	hw-config = "single_dsi";
 };
