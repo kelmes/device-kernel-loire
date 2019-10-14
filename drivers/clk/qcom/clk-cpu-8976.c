@@ -170,7 +170,10 @@ static const char * const cpuss_parent_names_cci[] = {
 	"gpll0_ao_out_main",
 };
 
-/* Early output of PLL: 1.7GHz default */
+/*
+ * Early output of PLL: 1.7GHz default
+ * Safely park at 1017.6MHz
+ */
 static struct hfpll_data a72ss_hf_pll_data = {
 	.mode_reg = 0x0,
 	.l_reg = 0x4,
@@ -184,16 +187,18 @@ static struct hfpll_data a72ss_hf_pll_data = {
 	.spm_event_bit = 0x4,
 	.user_vco_mask = 0x3 << 28,
 	.pre_div_mask = BIT(12),
-	.pre_div_mask = 0,
-	.post_div_mask = 0x300,
+	.pre_div_masked = 0,
+	.post_div_mask = (BIT(8) | BIT(9)),
 	.post_div_masked = 0x100,
 	.early_output_mask =  0x8,
 	.main_output_mask = BIT(0),
-	.vco_mode_masked = 0x100000,
+	.vco_mode_masked = BIT(20),
 	.config_val = 0x04E0405D,
 	.max_rate = 2016000000UL,
 	.min_rate = 940800000UL,
 	.l_val = 0x5B,
+	.l_park_val = 0x35,
+	.safe_parking_enabled = true,
 };
 
 static struct clk_hfpll a72ss_hf_pll = {
@@ -235,7 +240,7 @@ static struct hfpll_data a53ss_sr_pll_data = {
 	.spm_event_bit = 0x4,
 	.user_vco_mask = 0x3 << 20,
 	.pre_div_mask = 0x7 << 12,
-	.post_div_mask = 0x3 << 8,
+	.post_div_mask = (BIT(8) | BIT(9)),
 	.post_div_masked =  0x1 << 8,
 	.early_output_mask =  BIT(3),
 	.main_output_mask = BIT(0),
@@ -246,6 +251,7 @@ static struct hfpll_data a53ss_sr_pll_data = {
 	.max_rate = 1478400000UL,
 	.low_vco_max_rate = 902400000UL,
 	.l_val = 0x49,
+	.safe_parking_enabled = false,
 };
 
 static struct clk_hfpll a53ss_sr_pll = {
@@ -286,7 +292,7 @@ static struct hfpll_data cci_sr_pll_data = {
 	.spm_event_bit = 0x0,
 	.user_vco_mask = 0x3 << 20,
 	.pre_div_mask = 0x7 << 12,
-	.post_div_mask = 0x3 << 8,
+	.post_div_mask = (BIT(8) | BIT(9)),
 	.early_output_mask =  BIT(3),
 	.main_output_mask = BIT(0),
 	.post_div_masked = 0x1 << 8,
@@ -295,6 +301,7 @@ static struct hfpll_data cci_sr_pll_data = {
 	.min_rate = 307200000UL,
 	.max_rate = 902400000UL,
 	.l_val = 0x20,
+	.safe_parking_enabled = false,
 };
 
 static struct clk_hfpll cci_sr_pll = {
@@ -360,7 +367,7 @@ static const struct regmap_config mux_blocks_regmap_config = {
 	.fast_io        = true,
 };
 
-static const char *mux_names[] = {"c0", "c1", "cci"};
+static const char const *mux_names[] = {"c0", "c1", "cci"};
 
 #define CPU_LATENCY_NO_L2_PC_US (280)
 
@@ -869,7 +876,6 @@ static void print_opp_table(int a53_cpu, int a72_cpu)
 	unsigned long apc0_fmin = a53ssmux.clkr.hw.init->rate_max[1];
 	unsigned long apc1_fmin = a72ssmux.clkr.hw.init->rate_max[1];
 
-	rcu_read_lock();
 
 	oppfmax = dev_pm_opp_find_freq_exact(get_cpu_device(a53_cpu), apc0_fmax,
 					     true);
@@ -892,8 +898,6 @@ static void print_opp_table(int a53_cpu, int a72_cpu)
 		dev_pm_opp_get_voltage(oppfmin));
 	pr_info("clock_cpu: a72: OPP voltage for %lu: %lu\n", apc1_fmax,
 		dev_pm_opp_get_voltage(oppfmax));
-
-	rcu_read_unlock();
 }
 
 static void populate_opp_table(struct platform_device *pdev)
