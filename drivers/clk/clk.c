@@ -761,7 +761,7 @@ static int clk_unvote_vdd_level(struct clk_vdd_class *vdd_class, int level)
 
 	mutex_lock(&vdd_class->lock);
 
-	if (WARN(!vdd_class->level_votes[level],
+	if (WARN_ONCE(!vdd_class->level_votes[level],
 				"Reference counts are incorrect for %s level %d\n",
 				vdd_class->class_name, level))
 		goto out;
